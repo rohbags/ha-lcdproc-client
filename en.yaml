@@ -1,0 +1,33 @@
+
+configuration:
+  lcdproc_host:
+    name: LCDproc Server
+    description: The IP address of the local LCDproc server.
+  lcdproc_port:
+    name: LCDproc Port
+    description: The port used by the LCDproc server.
+  show_default:
+    name: Enable Default Screen
+    description: Show the default HA info screen
+  show_cpu:
+    name: Enable CPU screen
+    description: Show the CPU load in percentage
+  show_mem:
+    name: Enable Memory Screen
+    description: Show the memory used
+  show_net:
+    name: Enable Network Screen
+    description: Show the network throughput and usage 
+  show_disk:
+    name: Enable Disk Screen
+    description: Show the disk usage
+  show_sensors:
+    name: Enable Sensors Screen
+    description: Show the sensors screen
+  list_sensors:
+    name: List of Sensors
+    description: A comma seperated list of sensors to show
+      
+  
+  
+  
