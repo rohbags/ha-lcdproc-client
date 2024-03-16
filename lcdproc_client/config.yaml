@@ -1,6 +1,6 @@
 name: "LCDproc Client"
 description: "A LCDproc client for Home Assistant"
-version: "0.1.11"
+version: "0.1.16"
 slug: "lcdproc_client"
 url: https://github.com/rohbags/ha-lcdproc-client
 init: false
@@ -24,7 +24,7 @@ options:
   show_net: false
   show_disk: false
   show_sensors: false
-  list_sensors: ""
+  list_sensors:
   debug: false
 schema:
   lcdproc_host: str
@@ -35,6 +35,7 @@ schema:
   show_net: bool
   show_disk: bool
   show_sensors: bool
-  list_sensors: str?
+  list_sensors:
+    - str?
   debug: bool
 

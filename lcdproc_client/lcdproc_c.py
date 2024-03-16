@@ -33,6 +33,7 @@ if jdata['lcdproc_host'] == "":
   print ("ERROR: no lcdproc server host set!")
   exit(1)
 
+
 ## is debug mode?
 debug = False
 if jdata['debug'] == True:
@@ -45,13 +46,13 @@ if debug: print("API Token: ", token)
 api_headers = {'Authorization':'Bearer ' + token, 'Content-Type':'application/json'}
 
 ## for testing new sensors etc
-#api_res = requests.get('http://supervisor/core/api/states/sensor.house_meter_power', headers=api_headers) # ?
-if debug: 
-  api_res = requests.get('http://supervisor/core/api/states/binary_sensor.garage_door_status', headers=api_headers) # ?
-  print("test1d api request:")
-  print( api_res )
-  print("json1d:")
-  print( api_res.json() )
+##api_res = requests.get('http://supervisor/core/api/states/sensor.house_meter_power', headers=api_headers) # ?
+#if debug: 
+#  api_res = requests.get('http://supervisor/core/api/states/binary_sensor.garage_door_status', headers=api_headers) # ?
+#  print("test1d api request:")
+#  print( api_res )
+#  print("json1d:")
+#  print( api_res.json() )
 
 api_res = requests.get('http://supervisor/supervisor/info', headers=api_headers) # ?
 sys_tz = api_res.json()['data']['timezone']
@@ -106,7 +107,6 @@ def receive(socket, signal):
                 print("server cmd->key: ", m.group(2))
             else:
               print("ERROR: cant decode cmd: ["+ data +"]" )
-#        time.sleep(0.00001)
 
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -133,11 +133,20 @@ def get_api(type):
     ret = api_res.json()
     return ret['data']['operating_system'], ret['data']['kernel'], ret['data']['boot_timestamp']
   elif type == "cpu":
-    api_res = requests.get('http://supervisor/core/stats', headers=api_headers)
+#    api_res = requests.get('http://supervisor/core/stats', headers=api_headers)
+    api_res = requests.get('http://supervisor/core/api/states/sensor.processor_use', headers=api_headers)
     if api_res.status_code != 200:
       print("API Error")
     ret = api_res.json()
-    return ret['data']['cpu_percent']
+#    return ret['data']['cpu_percent']
+    api_res = requests.get('http://supervisor/core/api/states/sensor.processor_temperature', headers=api_headers)
+    if api_res.status_code != 200:
+      print("API Error")
+    ret2 = api_res.json()
+
+    return ret['state'], ret2['state']
+
+    
   elif type == "mem":
     api_res = requests.get('http://supervisor/core/stats', headers=api_headers)
     if api_res.status_code != 200:
@@ -266,7 +275,9 @@ def run_screen():
               elif do_widget == "ha_cpu":
                 while do_screen == True and do_widget == "ha_cpu":
                     tmp = get_api("cpu")
-                    send_data("widget_set ha_cpu text 1 2 {" + centre_text("CPU: "+str(tmp)+"%", 20) + "}")
+#                    send_data("widget_set ha_cpu text 1 2 {" + centre_text("CPU: "+str(tmp)+"%", 20) + "}") # old cpu
+                    send_data("widget_set ha_cpu text 1 2 {" + centre_text("CPU Load: "+str(tmp[0])+"% ", 20) + "}")
+                    send_data("widget_set ha_cpu text3 1 3 {" + centre_text("CPU Temp: "+str(tmp[1])+"°C", 20) + "}")
                     time.sleep(0.1)
               elif do_widget == "ha_mem":
                 while do_screen == True and do_widget == "ha_mem":
@@ -280,15 +291,26 @@ def run_screen():
                   screen_id = do_widget
                   sensor_id = ""
                   for s in sensors:
+                    if debug: print("s0:"+str(s[0]) +" s1:"+str(s[1])+" s2:"+str(s[2]) )
                     ## match screen_id
                     if s[0] == screen_id:
                       sensor_id = s[1]
+                      if s[2] != '':
+                        sensor_name = s[2]
+                      else:
+                        sensor_name = ''
                       break
                   if sensor_id == "":
                     print("ERROR no sensor_id found for "+ screen_id)
                     break
                   tmp = get_api(screen_id)
-                  send_data("widget_set "+str(screen_id)+" text2 1 2 20 2 h 2 {" + centre_text(str(tmp[1]), 20) + "}") ## friendly name
+#                  if sensor_name in locals():
+#                  if sensor_name:
+                  if sensor_name != '':
+                    send_data("widget_set "+str(screen_id)+" text2 1 2 20 2 h 2 {" + centre_text(str(sensor_name), 20) + "}") ## friendly name
+                  else:
+                    send_data("widget_set "+str(screen_id)+" text2 1 2 20 2 h 2 {" + centre_text(str(tmp[1]), 20) + "}") ## friendly name
+#                  send_data("widget_set "+str(screen_id)+" text2 1 2 20 2 h 2 {" + centre_text(str(tmp[1]), 20) + "}") ## friendly name
                   send_data("widget_set "+str(screen_id)+" text3 1 3 \"" + centre_text(str(tmp[0]), 20 ) +"\"") ## state # double quote for special chars?
                   send_data("widget_set "+str(screen_id)+' text4 1 4 \"' + centre_text(""+ last_update(tmp[2]) +" ago", 20) + '\"') ## last updated
                   time.sleep(0.1)
@@ -376,6 +398,7 @@ if jdata['show_cpu'] == True:
   send_data("widget_set ha_cpu title {HA CPU %}")
   send_data("widget_add ha_cpu text string")
   send_data("widget_set ha_cpu text 1 2 {default cpu txt}")
+  send_data("widget_add ha_cpu text3 string")
 if jdata['show_mem'] == True:
   send_data("screen_add ha_mem")
   send_data("screen_set ha_mem name {HA MEM %}")
@@ -407,12 +430,21 @@ if jdata['show_disk'] == True:
 ## build array of sensors to show, create screens for each
 if jdata['show_sensors'] == True and jdata['list_sensors'] != "":
   print("Building sensors list:")
-  s_list = jdata['list_sensors'].split(",")
+
+  if debug: print("list_sensors: [", jdata['list_sensors'], "]")
   cnt = 0
-  for s in s_list:
-    s = s.strip()
-    sensors.append(["ha_sensor"+str(cnt), s])
-    print("** Found sensor: ", s)
+  for x in jdata['list_sensors']:
+    if debug: print("adding sensor: ", x)
+  # does have optional name?
+
+    m = re.compile("^(\w+\.\w+)\s\"([\w\s]+)\"$").match(x)
+    if m:
+      sensors.append(["ha_sensor"+str(cnt), m.group(1), m.group(2) ])
+      if debug: print("sensor: ", m.group(1) )
+      if debug: print("name: ", m.group(2) )
+    else:
+      if debug: print("no name sensor: ", x )
+      sensors.append(["ha_sensor"+str(cnt), x, ''])
     send_data("screen_add ha_sensor"+str(cnt))
     send_data("screen_set ha_sensor"+str(cnt)+" name {HA Sensor"+str(cnt)+"}")
     send_data("widget_add ha_sensor"+str(cnt)+" title title")
@@ -422,11 +454,18 @@ if jdata['show_sensors'] == True and jdata['list_sensors'] != "":
     send_data("widget_add ha_sensor"+str(cnt)+" text4 string")
     send_data("widget_set ha_sensor"+str(cnt)+" text3 1 2 {default sensor"+str(cnt)+" txt}")
     cnt = cnt + 1
+
+  print("size of sensors: ", len(sensors) )
+  print("sensors dump:")
+  for x in sensors:
+    print("s_dump screen_id:"+ str(x[0]) +" sensor_id:"+ str(x[1]) +" name:"+ str(x[2]) )
+
+
   if debug:
     print("size of sensors: ", len(sensors) )
     print("sensors dump:")
     for x in sensors:
-      print("s_dump screen_id:"+ str(x[0]) +" sensor_id:"+ str(x[1]) )
+      print("s_dump screen_id:"+ str(x[0]) +" sensor_id:"+ str(x[1]) +" name:"+ str(x[2]) )
 else:
   print("sensors not enable OR list is empty")
 
