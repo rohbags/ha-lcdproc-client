@@ -26,3 +26,7 @@ configuration:
   list_sensors:
     name: List of Sensors
     description: A comma seperated list of sensors to show
+  debug:
+    name: Debug
+    description: enable debug mode output    
+
